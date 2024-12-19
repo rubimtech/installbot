@@ -1,5 +1,7 @@
 #!/bin/bash
-#-sSL https://raw.githubusercontent.com/rubimtech/installbot/main/setup_ssh.sh | bash
+# curl -sSL https://raw.githubusercontent.com/rubimtech/installbot/main/setup_ssh.sh | bash
+
+
 # Путь к директории с ключами
 KEY_DIR="$HOME/.ssh"
 PRIVATE_KEY="$KEY_DIR/id_rsa"
@@ -21,11 +23,23 @@ else
     echo "Публичный ключ найден: $PUBLIC_KEY"
 fi
 
-# Пример команды для копирования публичного ключа на удаленный сервер
-# Убедитесь, что вы заменили <server_address> на нужный адрес сервера
-# и <user> на имя пользователя, для которого нужно скопировать ключ
+# Добавление публичного ключа на сервер, если он еще не добавлен
+if ! grep -q "$(cat $PUBLIC_KEY)" ~/.ssh/authorized_keys; then
+    echo "Добавление публичного ключа в файл authorized_keys..."
 
-# echo "Копирование публичного ключа на сервер..."
-# ssh-copy-id -i $PUBLIC_KEY user@server_address
+    # Создание файла authorized_keys, если его нет
+    mkdir -p ~/.ssh
+    touch ~/.ssh/authorized_keys
 
+    # Добавление публичного ключа в файл authorized_keys
+    cat $PUBLIC_KEY >> ~/.ssh/authorized_keys
+    chmod 600 ~/.ssh/authorized_keys
+
+    echo "Публичный ключ добавлен в файл authorized_keys."
+else
+    echo "Публичный ключ уже добавлен в файл authorized_keys."
+fi
+
+# Вывод сообщения о завершении
 echo "Процесс завершен."
+
