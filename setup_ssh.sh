@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#-sSL https://raw.githubusercontent.com/rubimtech/installbot/main/setup_ssh.sh | bash
 # Путь к директории с ключами
 KEY_DIR="$HOME/.ssh"
 PRIVATE_KEY="$KEY_DIR/id_rsa"
