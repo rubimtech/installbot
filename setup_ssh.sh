@@ -1,47 +1,31 @@
 #!/bin/bash
 
-# Проверка, что скрипт запущен от пользователя root
-if [ "$(id -u)" -ne 0 ]; then
-    echo "Скрипт должен быть запущен от пользователя root."
-    exit 1
+# Путь к директории с ключами
+KEY_DIR="$HOME/.ssh"
+PRIVATE_KEY="$KEY_DIR/id_rsa"
+PUBLIC_KEY="$KEY_DIR/id_rsa.pub"
+
+# Проверка на наличие публичного и приватного ключей
+if [ ! -f "$PUBLIC_KEY" ]; then
+    echo "Публичный ключ не найден: $PUBLIC_KEY"
+    echo "Генерация новой пары ключей..."
+
+    # Создание директории .ssh, если она не существует
+    mkdir -p $KEY_DIR
+
+    # Генерация новой пары ключей
+    ssh-keygen -t rsa -b 2048 -f $PRIVATE_KEY -N ""
+
+    echo "Ключи успешно созданы: $PRIVATE_KEY и $PUBLIC_KEY"
+else
+    echo "Публичный ключ найден: $PUBLIC_KEY"
 fi
 
-# Убедитесь, что публичный ключ существует
-PUBLIC_KEY_PATH="$HOME/.ssh/id_rsa.pub"
-if [ ! -f "$PUBLIC_KEY_PATH" ]; then
-    echo "Публичный ключ не найден: $PUBLIC_KEY_PATH"
-    exit 1
-fi
+# Пример команды для копирования публичного ключа на удаленный сервер
+# Убедитесь, что вы заменили <server_address> на нужный адрес сервера
+# и <user> на имя пользователя, для которого нужно скопировать ключ
 
-# Создание каталога .ssh, если он не существует
-SSH_DIR="$HOME/.ssh"
-if [ ! -d "$SSH_DIR" ]; then
-    echo "Создание директории $SSH_DIR..."
-    mkdir -p "$SSH_DIR"
-    chmod 700 "$SSH_DIR"
-fi
+# echo "Копирование публичного ключа на сервер..."
+# ssh-copy-id -i $PUBLIC_KEY user@server_address
 
-# Добавление публичного ключа в файл authorized_keys
-AUTHORIZED_KEYS="$SSH_DIR/authorized_keys"
-echo "Добавление публичного ключа в $AUTHORIZED_KEYS..."
-cat "$PUBLIC_KEY_PATH" >> "$AUTHORIZED_KEYS"
-chmod 600 "$AUTHORIZED_KEYS"
-
-# Проверка конфигурации SSH для разрешения аутентификации по ключу
-SSHD_CONFIG="/etc/ssh/sshd_config"
-if ! grep -q "PubkeyAuthentication yes" "$SSHD_CONFIG"; then
-    echo "Разрешение аутентификации по ключу не найдено. Добавление в $SSHD_CONFIG..."
-    echo "PubkeyAuthentication yes" >> "$SSHD_CONFIG"
-fi
-
-if ! grep -q "AuthorizedKeysFile .ssh/authorized_keys" "$SSHD_CONFIG"; then
-    echo "Путь к файлу authorized_keys не найден. Добавление в $SSHD_CONFIG..."
-    echo "AuthorizedKeysFile .ssh/authorized_keys" >> "$SSHD_CONFIG"
-fi
-
-# Перезапуск SSH сервиса для применения изменений
-echo "Перезапуск SSH сервиса..."
-systemctl restart ssh
-
-# Уведомление о завершении
-echo "SSH настроен для аутентификации с использованием публичного ключа."
+echo "Процесс завершен."
