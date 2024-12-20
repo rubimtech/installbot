@@ -10,9 +10,14 @@ fi
 # Переменные, задаваемые пользователем
 PGUSER=""
 PGPASSWORD=""
-DBNAME="solobot"
+DBNAME=""
 DOMAIN=""
 YANDEX_DISK_CODE=""
+
+# Функция для генерации имени базы данных
+generate_dbname() {
+  echo "$(tr -dc A-Za-z </dev/urandom | head -c 4)_bot"
+}
 
 # Функция для проверки переменной и задания значения
 ask_if_empty() {
@@ -35,7 +40,7 @@ ask_if_empty() {
 # Спрашиваем значения переменных
 ask_if_empty "PGUSER" "Введите имя пользователя для PostgreSQL: " ""
 ask_if_empty "PGPASSWORD" "Введите пароль для пользователя $PGUSER: " ""
-ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: solobot]: " "solobot"
+ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: сгенерированное значение]: " "$(generate_dbname)"
 ask_if_empty "DOMAIN" "Введите домен для вашего бота: " ""
 ask_if_empty "YANDEX_DISK_CODE" "Введите код публичного доступа к каталогу Яндекс.Диска: " ""
 
