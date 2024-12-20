@@ -7,6 +7,38 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# Переменные, задаваемые пользователем
+PGUSER=""
+PGPASSWORD=""
+DBNAME="solobot"
+DOMAIN=""
+YANDEX_DISK_CODE=""
+
+# Функция для проверки переменной и задания значения
+ask_if_empty() {
+  VAR_NAME=$1
+  PROMPT=$2
+  DEFAULT_VALUE=$3
+  VALUE=${!VAR_NAME}
+
+  if [ -z "$VALUE" ]; then
+    read -p "$PROMPT" USER_INPUT
+    if [ -z "$USER_INPUT" ]; then
+      VALUE=$DEFAULT_VALUE
+    else
+      VALUE=$USER_INPUT
+    fi
+    declare -g "$VAR_NAME"="$VALUE"
+  fi
+}
+
+# Спрашиваем значения переменных
+ask_if_empty "PGUSER" "Введите имя пользователя для PostgreSQL: " ""
+ask_if_empty "PGPASSWORD" "Введите пароль для пользователя $PGUSER: " ""
+ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: solobot]: " "solobot"
+ask_if_empty "DOMAIN" "Введите домен для вашего бота: " ""
+ask_if_empty "YANDEX_DISK_CODE" "Введите код публичного доступа к каталогу Яндекс.Диска: " ""
+
 # Функция для проверки и установки пакетов
 install_package() {
   PACKAGE=$1
@@ -40,19 +72,13 @@ else
 fi
 
 # Настройка PostgreSQL
-read -p "Введите имя пользователя для PostgreSQL: " PGUSER
 if sudo -i -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PGUSER'" | grep -q 1; then
   echo -e "\033[32mПользователь $PGUSER уже существует.\033[0m"
 else
   echo -e "\033[33mСоздаю пользователя $PGUSER...\033[0m"
   sudo -i -u postgres createuser "$PGUSER"
-  read -sp "Введите пароль для пользователя $PGUSER: " PGPASSWORD
   sudo -i -u postgres psql -c "ALTER USER $PGUSER WITH PASSWORD '$PGPASSWORD';"
 fi
-
-defaultdb="solobot"
-read -p "Введите имя базы данных [по умолчанию: $defaultdb]: " DBNAME
-DBNAME=${DBNAME:-$defaultdb}
 
 if sudo -i -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DBNAME'" | grep -q 1; then
   echo -e "\033[32mБаза данных $DBNAME уже существует.\033[0m"
@@ -62,7 +88,6 @@ else
 fi
 
 # Настройка домена и сертификатов
-read -p "Введите домен для вашего бота: " DOMAIN
 certbot --nginx -d "$DOMAIN"
 
 # Конфигурация Nginx
@@ -130,11 +155,8 @@ mkdir -p "$BOT_DIR"
 cd "$BOT_DIR"
 echo -e "\033[33mЗагружаю и распаковываю код бота...\033[0m"
 
-# Просим пользователя ввести публичный код Яндекс.Диска
-read -p "Введите код публичного доступа к каталогу Яндекс.Диска: " YANDEX_DISK_CODE
+# Загрузка файлов с Яндекс.Диска
 YANDEX_DISK_PUBLIC_URL="https://disk.yandex.ru/d/$YANDEX_DISK_CODE"
-
-# Получаем список файлов
 FILE_LIST=$(curl -s "https://cloud-api.yandex.net/v1/disk/public/resources?public_key=$YANDEX_DISK_PUBLIC_URL&limit=100" | jq -r '.embedded.items[] | select(.type == "file") | .file')
 
 if [ -z "$FILE_LIST" ]; then
