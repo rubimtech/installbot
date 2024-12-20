@@ -28,9 +28,8 @@ ask_if_empty() {
 
   if [ -z "$VALUE" ]; then
     read -p "$PROMPT" USER_INPUT
-    if [ -z "$USER_INPUT" ]; then
-      VALUE=$DEFAULT_VALUE
-    else
+    # Если пользователь оставил строку пустой, оставляем переменную пустой, без значения по умолчанию
+    if [ -n "$USER_INPUT" ]; then
       VALUE=$USER_INPUT
     fi
     declare -g "$VAR_NAME"="$VALUE"
