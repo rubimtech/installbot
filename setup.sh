@@ -92,7 +92,8 @@ else
 fi
 
 # Настройка домена и сертификатов
-certbot --nginx -d "$DOMAIN" --register-unsafely-without-email
+yes Y | certbot --nginx -d "$DOMAIN" --agree-tos --email "user@example.com"
+
 
 
 # Конфигурация Nginx
