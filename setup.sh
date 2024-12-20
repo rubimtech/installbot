@@ -8,11 +8,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Переменные, задаваемые пользователем
-PGUSER=""
-PGPASSWORD=""
-DBNAME=""
-DOMAIN=""
-YANDEX_DISK_CODE=""
+PGUSER="user"
+PGPASSWORD="pass"
+DBNAME="$(generate_dbname)"
+DOMAIN="5319f6883d27.vps.myjino.ru"
+YANDEX_DISK_CODE="hToR5KQ8jDrvUw"
 
 # Функция для генерации имени базы данных
 generate_dbname() {
@@ -39,7 +39,7 @@ ask_if_empty() {
 # Спрашиваем значения переменных
 ask_if_empty "PGUSER" "Введите имя пользователя для PostgreSQL: " ""
 ask_if_empty "PGPASSWORD" "Введите пароль для пользователя $PGUSER: " ""
-ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: сгенерированное значение]: " "$(generate_dbname)"
+ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: сгенерированное значение]: " "$DBNAME"
 ask_if_empty "DOMAIN" "Введите домен для вашего бота: " ""
 ask_if_empty "YANDEX_DISK_CODE" "Введите код публичного доступа к каталогу Яндекс.Диска: " ""
 
