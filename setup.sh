@@ -3,7 +3,7 @@
 
 # Проверка, выполнена ли команда с правами суперпользователя
 if [ "$EUID" -ne 0 ]; then
-  echo "\033[31mПожалуйста, запустите скрипт с правами суперпользователя (sudo).\033[0m"
+  echo -e "\033[31mПожалуйста, запустите скрипт с правами суперпользователя (sudo).\033[0m"
   exit 1
 fi
 
@@ -11,10 +11,10 @@ fi
 install_package() {
   PACKAGE=$1
   if ! dpkg -l | grep -q "$PACKAGE"; then
-    echo "\033[33mУстанавливаю $PACKAGE...\033[0m"
+    echo -e "\033[33mУстанавливаю $PACKAGE...\033[0m"
     apt update && apt install -y "$PACKAGE"
   else
-    echo "\033[32m$PACKAGE уже установлен.\033[0m"
+    echo -e "\033[32m$PACKAGE уже установлен.\033[0m"
   fi
 }
 
@@ -27,38 +27,39 @@ install_package postgresql
 install_package postgresql-contrib
 install_package certbot
 install_package python3-certbot-nginx
+install_package jq
 
 # Установка Python 3.12
 if ! python3.12 --version &>/dev/null; then
-  echo "\033[33mУстанавливаю Python 3.12...\033[0m"
+  echo -e "\033[33mУстанавливаю Python 3.12...\033[0m"
   add-apt-repository -y ppa:deadsnakes/ppa
   apt update
   apt install -y python3.12 python3.12-venv python3.12-distutils
 else
-  echo "\033[32mPython 3.12 уже установлен.\033[0m"
+  echo -e "\033[32mPython 3.12 уже установлен.\033[0m"
 fi
 
 # Настройка PostgreSQL
-read -p "Введите имя пользователя PostgreSQL: " DB_USER
-read -s -p "Введите пароль для пользователя PostgreSQL: " DB_PASS
-echo ""
-read -p "Введите имя базы данных: " DB_NAME
-
-sudo -i -u postgres bash <<EOF
-if ! psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER';" | grep -q 1; then
-  echo "\033[33mСоздаю пользователя PostgreSQL '$DB_USER'...\033[0m"
-  psql -c "CREATE ROLE $DB_USER WITH LOGIN PASSWORD '$DB_PASS';"
+read -p "Введите имя пользователя для PostgreSQL: " PGUSER
+if sudo -i -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PGUSER'" | grep -q 1; then
+  echo -e "\033[32mПользователь $PGUSER уже существует.\033[0m"
 else
-  echo "\033[32mПользователь PostgreSQL '$DB_USER' уже существует.\033[0m"
+  echo -e "\033[33mСоздаю пользователя $PGUSER...\033[0m"
+  sudo -i -u postgres createuser "$PGUSER"
+  read -sp "Введите пароль для пользователя $PGUSER: " PGPASSWORD
+  sudo -i -u postgres psql -c "ALTER USER $PGUSER WITH PASSWORD '$PGPASSWORD';"
 fi
 
-if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME';" | grep -q 1; then
-  echo "\033[33mСоздаю базу данных '$DB_NAME'...\033[0m"
-  createdb "$DB_NAME" -O "$DB_USER"
+defaultdb="solobot"
+read -p "Введите имя базы данных [по умолчанию: $defaultdb]: " DBNAME
+DBNAME=${DBNAME:-$defaultdb}
+
+if sudo -i -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DBNAME'" | grep -q 1; then
+  echo -e "\033[32mБаза данных $DBNAME уже существует.\033[0m"
 else
-  echo "\033[32mБаза данных '$DB_NAME' уже существует.\033[0m"
+  echo -e "\033[33mСоздаю базу данных $DBNAME...\033[0m"
+  sudo -i -u postgres createdb "$DBNAME" --owner="$PGUSER"
 fi
-EOF
 
 # Настройка домена и сертификатов
 read -p "Введите домен для вашего бота: " DOMAIN
@@ -67,7 +68,7 @@ certbot --nginx -d "$DOMAIN"
 # Конфигурация Nginx
 NGINX_CONFIG="/etc/nginx/sites-available/$DOMAIN"
 NGINX_LINK="/etc/nginx/sites-enabled/$DOMAIN"
-echo "\033[33mНастраиваю Nginx для домена $DOMAIN...\033[0m"
+echo -e "\033[33mНастраиваю Nginx для домена $DOMAIN...\033[0m"
 cat > "$NGINX_CONFIG" <<EOL
 server {
     listen 80;
@@ -124,24 +125,32 @@ systemctl restart nginx
 
 # Настройка Python окружения
 BOT_DIR="/opt/solobot"
-echo "\033[33mСоздаю директорию для бота: $BOT_DIR\033[0m"
+echo -e "\033[33mСоздаю директорию для бота: $BOT_DIR\033[0m"
 mkdir -p "$BOT_DIR"
 cd "$BOT_DIR"
+echo -e "\033[33mЗагружаю и распаковываю код бота...\033[0m"
 
-echo "\033[33mЗагружаю и распаковываю код бота...\033[0m"
+# Просим пользователя ввести публичный код Яндекс.Диска
+read -p "Введите код публичного доступа к каталогу Яндекс.Диска: " YANDEX_DISK_CODE
+YANDEX_DISK_PUBLIC_URL="https://disk.yandex.ru/d/$YANDEX_DISK_CODE"
 
-# Загрузка файла с Яндекс.Диска
-YANDEX_DISK_PUBLIC_URL="https://disk.yandex.ru/d/hToR5KQ8jDrvUw"
-YANDEX_DOWNLOAD_URL=$(curl -s "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$YANDEX_DISK_PUBLIC_URL" | grep -oP '(?<="href":")[^"]+')
+# Получаем список файлов
+FILE_LIST=$(curl -s "https://cloud-api.yandex.net/v1/disk/public/resources?public_key=$YANDEX_DISK_PUBLIC_URL&limit=100" | jq -r '.embedded.items[] | select(.type == "file") | .file')
 
-curl -L -o solobot.zip "$YANDEX_DOWNLOAD_URL"
+if [ -z "$FILE_LIST" ]; then
+  echo -e "\033[31mКаталог пуст или ссылка недействительна.\033[0m"
+  exit 1
+fi
 
-unzip solobot.zip -d "$BOT_DIR"
-mv "$BOT_DIR/solo_bot"/* "$BOT_DIR"
-rm -r "$BOT_DIR/solo_bot" solobot.zip
+# Скачиваем файлы
+for FILE_URL in $FILE_LIST; do
+  FILE_NAME=$(basename "$FILE_URL")
+  echo -e "\033[33mСкачиваю $FILE_NAME...\033[0m"
+  curl -L -o "$FILE_NAME" "$FILE_URL"
+done
 
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-echo "\033[32mСкрипт завершен. Пожалуйста, убедитесь, что все настройки выполнены корректно.\033[0m"
+echo -e "\033[32mСкрипт завершен. Пожалуйста, убедитесь, что все настройки выполнены корректно.\033[0m"
