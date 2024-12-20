@@ -92,7 +92,8 @@ else
 fi
 
 # Настройка домена и сертификатов
-certbot --nginx -d "$DOMAIN"
+certbot --nginx -d "$DOMAIN" --register-unsafely-without-email
+
 
 # Конфигурация Nginx
 NGINX_CONFIG="/etc/nginx/sites-available/$DOMAIN"
