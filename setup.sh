@@ -1,4 +1,5 @@
 #!/bin/bash
+# curl -sSL https://raw.githubusercontent.com/rubimtech/installbot/main/setup.sh | bash
 
 # Проверка, выполнена ли команда с правами суперпользователя
 if [ "$EUID" -ne 0 ]; then
@@ -20,13 +21,22 @@ install_package() {
 # Установка основных пакетов
 install_package curl
 install_package nginx
-install_package python3
 install_package python3-venv
 install_package python3-pip
 install_package postgresql
 install_package postgresql-contrib
 install_package certbot
 install_package python3-certbot-nginx
+
+# Установка Python 3.12
+if ! python3.12 --version &>/dev/null; then
+  echo "Устанавливаю Python 3.12..."
+  add-apt-repository -y ppa:deadsnakes/ppa
+  apt update
+  apt install -y python3.12 python3.12-venv python3.12-distutils
+else
+  echo "Python 3.12 уже установлен."
+fi
 
 # Настройка PostgreSQL
 sudo -i -u postgres bash <<EOF
@@ -114,7 +124,7 @@ unzip solobot.zip -d "$BOT_DIR"
 mv "$BOT_DIR/solo_bot"/* "$BOT_DIR"
 rm -r "$BOT_DIR/solo_bot" solobot.zip
 
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
