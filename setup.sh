@@ -99,6 +99,13 @@ certbot --nginx -d "$DOMAIN"
 NGINX_CONFIG="/etc/nginx/sites-available/$DOMAIN"
 NGINX_LINK="/etc/nginx/sites-enabled/$DOMAIN"
 echo -e "\033[33mНастраиваю Nginx для домена $DOMAIN...\033[0m"
+
+# Проверяем, если в /etc/nginx/sites-enabled/ существует директория с именем домена, удаляем её
+if [ -d "$NGINX_LINK" ]; then
+  sudo rm -r "$NGINX_LINK"
+fi
+
+# Настроим конфигурацию Nginx
 cat > "$NGINX_CONFIG" <<EOL
 server {
     listen 80;
@@ -150,8 +157,12 @@ server {
     }
 }
 EOL
-ln -s "$NGINX_CONFIG" "$NGINX_LINK"
-systemctl restart nginx
+
+# Создаём символическую ссылку на конфигурацию
+sudo ln -s "$NGINX_CONFIG" "$NGINX_LINK"
+
+# Перезапускаем Nginx
+sudo systemctl restart nginx
 
 # Настройка Python окружения
 BOT_DIR="/opt/solobot"
@@ -176,8 +187,9 @@ for FILE_URL in $FILE_LIST; do
   curl -L -o "$FILE_NAME" "$FILE_URL"
 done
 
+# Создаем виртуальное окружение Python
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-echo -e "\033[32mСкрипт завершен. Пожалуйста, убедитесь, что все настройки выполнены корректно.\033[0m"
+echo -e "\033[32mСкрипт завершен. Пожалуйста, убедитесь, что все настройки выполнены корректно.\033[0m" 
