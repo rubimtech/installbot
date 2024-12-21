@@ -1,56 +1,36 @@
+
 #!/bin/bash
 # curl -sSL https://raw.githubusercontent.com/rubimtech/installbot/main/setup.sh | bash
 
 # Проверка, выполнена ли команда с правами суперпользователя
 if [ "$EUID" -ne 0 ]; then
-  echo -e "\033[31mПожалуйста, запустите скрипт с правами суперпользователя (sudo).\033[0m"
+  echo "Пожалуйста, запустите скрипт с правами суперпользователя (sudo)."
   exit 1
 fi
 
-# Переменные, задаваемые пользователем
-PGUSER="user"
-PGPASSWORD="pass"
-DBNAME="$(generate_dbname)"
-DOMAIN="5319f6883d27.vps.myjino.ru"
-YANDEX_DISK_CODE="hToR5KQ8jDrvUw"
+# Переменные
+REPO_URL="https://github.com/Vladless/Solo_bot.git"
+PROJECT_DIR="Solo_bot"
 
-# Функция для генерации имени базы данных
-generate_dbname() {
-  echo "$(tr -dc A-Za-z </dev/urandom | head -c 4)_bot"
-}
-
-# Функция для проверки переменной и задания значения
-ask_if_empty() {
-  VAR_NAME=$1
-  PROMPT=$2
-  DEFAULT_VALUE=$3
-  VALUE=${!VAR_NAME}
-
-  if [ -z "$VALUE" ]; then
-    read -p "$PROMPT" USER_INPUT
-    # Если пользователь оставил строку пустой, оставляем переменную пустой, без значения по умолчанию
-    if [ -n "$USER_INPUT" ]; then
-      VALUE=$USER_INPUT
-    fi
-    declare -g "$VAR_NAME"="$VALUE"
-  fi
-}
-
-# Спрашиваем значения переменных
-ask_if_empty "PGUSER" "Введите имя пользователя для PostgreSQL: " ""
-ask_if_empty "PGPASSWORD" "Введите пароль для пользователя $PGUSER: " ""
-ask_if_empty "DBNAME" "Введите имя базы данных [по умолчанию: сгенерированное значение]: " "$DBNAME"
-ask_if_empty "DOMAIN" "Введите домен для вашего бота: " ""
-ask_if_empty "YANDEX_DISK_CODE" "Введите код публичного доступа к каталогу Яндекс.Диска: " ""
+POSTGRES_USER="solobotuser"
+POSTGRES_PASSWORD="securepassword"
+POSTGRES_DB="solobot"
+DOMAIN="yourdomain.com"
+BOT_DIR="/opt/solobot"
+YANDEX_DISK_PUBLIC_URL="https://disk.yandex.ru/d/hToR5KQ8jDrvUw"
+PAHT_LOKAL ="C:\Users\olegs\Downloads"
+FILE_CONFIG="config.py"
+FILE_TEXTS="texts.py"
+# scp /path/to/local/file user@remote_host:/path/to/remote/destination
 
 # Функция для проверки и установки пакетов
 install_package() {
   PACKAGE=$1
   if ! dpkg -l | grep -q "$PACKAGE"; then
-    echo -e "\033[33mУстанавливаю $PACKAGE...\033[0m"
+    echo "Устанавливаю $PACKAGE..."
     apt update && apt install -y "$PACKAGE"
   else
-    echo -e "\033[32m$PACKAGE уже установлен.\033[0m"
+    echo "$PACKAGE уже установлен."
   fi
 }
 
@@ -63,17 +43,55 @@ install_package postgresql
 install_package postgresql-contrib
 install_package certbot
 install_package python3-certbot-nginx
-install_package jq
+install_package python3-pip
+install_package git
 
-# Установка Python 3.12
-if ! python3.12 --version &>/dev/null; then
-  echo -e "\033[33mУстанавливаю Python 3.12...\033[0m"
-  add-apt-repository -y ppa:deadsnakes/ppa
-  apt update
-  apt install -y python3.12 python3.12-venv python3.12-distutils
+# Проверка, установлен ли Python 3.12
+if ! python3.12 --version &> /dev/null; then
+    echo "Python 3.12 не установлен. Устанавливаю..."
+    sudo apt update
+    sudo apt install python3.12 -y
 else
-  echo -e "\033[32mPython 3.12 уже установлен.\033[0m"
+    echo "Python 3.12 уже установлен."
 fi
+
+# Проверка текущей версии Python 3
+CURRENT_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+if [[ "$CURRENT_VERSION" != 3.12* ]]; then
+    echo "Текущая версия Python 3: $CURRENT_VERSION. Переключаю на Python 3.12..."
+
+    # Настройка альтернатив
+    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+    sudo update-alternatives --set python3 /usr/bin/python3.12
+else
+    echo "Python 3 уже настроен на версию 3.12."
+fi
+
+#Клонирование репозитория
+echo "Клонируем репозиторий..."
+if [ -d "$PROJECT_DIR" ]; then
+    echo "Каталог $PROJECT_DIR уже существует. Пропускаю клонирование."
+else
+    git clone "$с"
+fi
+
+# Переход в директорию проекта
+cd "$PROJECT_DIR" || { echo "Не удалось перейти в каталог $PROJECT_DIR"; exit 1; }
+
+#Шаг 2: Создание и активация виртуального окружения
+echo "Создаем виртуальное окружение..."
+python3 -m venv venv
+
+echo "Активируем виртуальное окружение..."
+source venv/bin/activate
+
+# 3️⃣ Шаг 3: Установка зависимостей
+echo "Устанавливаем зависимости..."
+pip install -r requirements.txt
+
+# Сообщение о завершении
+echo "Установка завершена. Виртуальное окружение активировано. Вы можете начать использовать проект."
+
 
 # Настройка PostgreSQL
 if sudo -i -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$PGUSER'" | grep -q 1; then
